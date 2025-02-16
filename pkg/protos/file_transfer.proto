@@ -1,0 +1,41 @@
+// protoc --go_out=. --go-grpc_out=. protos/file_transfer.proto
+
+syntax = "proto3";
+
+package file_transfer;
+
+option go_package="./pkg/protos/gen/file_transfer;file_transfer";
+
+
+service FileTransfer {
+  rpc UploadFile(stream UploadFileRequest) returns (UploadFileResponse);
+  rpc ListFiles(Empty) returns (ListFilesResponse);
+  rpc GetFile(GetFileRequest) returns (stream GetFileResponse);
+}
+
+message UploadFileRequest {
+  string filename = 1;
+  bytes content = 2;
+}
+
+message UploadFileResponse {
+  string message = 1;
+}
+message Empty {}
+
+message FileInfo {
+  string name = 1;
+  string creation_time = 2;
+  string modification_time = 3;
+}
+message ListFilesResponse {
+  repeated FileInfo files = 1;
+}
+
+message GetFileRequest {
+  string filename = 1;
+}
+
+message GetFileResponse {
+  bytes content = 1;
+}

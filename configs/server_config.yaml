@@ -1,0 +1,6 @@
+server:
+  address: "localhost:50051"
+  limits:
+    upload_requests: 10
+    download_requests: 10
+    list_requests: 100
