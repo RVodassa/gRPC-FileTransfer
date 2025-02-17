@@ -3,20 +3,14 @@ package main
 import (
 	"github.com/RVodassa/FileTransfer/internal/server/app"
 	"github.com/RVodassa/FileTransfer/internal/server/config"
-	"github.com/joho/godotenv"
 	"log"
-	"os"
 )
 
-func init() {
-	if err := godotenv.Load(); err != nil {
-		log.Print("No .env file found")
-	}
-}
+const ServerConfigPath = "./configs/server_config.yaml"
 
 func main() {
-	cfgPath := os.Getenv("SERVER_CONFIG_PATH")
-	cfg, err := config.LoadConfig(cfgPath)
+
+	cfg, err := config.LoadConfig(ServerConfigPath)
 	if err != nil {
 		log.Printf("Error loading config: %v", err)
 		return

@@ -1,4 +1,4 @@
-package service
+package file
 
 import (
 	"bytes"
@@ -34,7 +34,6 @@ func (f *File) SetFile(fileName, path string) error {
 		return err
 	}
 	f.OutputFile = file
-	log.Printf("File created: %s", f.FilePath)
 	return nil
 }
 

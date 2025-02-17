@@ -9,6 +9,7 @@ type Config struct {
 	Server struct {
 		Address string `yaml:"address"`
 	} `yaml:"server"`
+	ClientDataDir string `yaml:"client_data_dir"`
 }
 
 func LoadConfig(filePath string) (*Config, error) {

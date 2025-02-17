@@ -1,2 +1,3 @@
 server:
   address: "localhost:50051"
+client_data_dir: "./data/client"

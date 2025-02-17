@@ -4,3 +4,4 @@ server:
     upload_requests: 10
     download_requests: 10
     list_requests: 100
+server_data_dir: "./data/server"

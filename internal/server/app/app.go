@@ -13,7 +13,8 @@ func Run(cfg *config.ServerConfig) {
 
 	lis, err := net.Listen("tcp", cfg.Server.Address)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Printf("failed to listen: %v", err)
+		return
 	}
 
 	s := grpc.NewServer()
@@ -22,6 +23,7 @@ func Run(cfg *config.ServerConfig) {
 
 	log.Printf("Server is running on port %s", cfg.Server.Address)
 	if err = s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Printf("failed to serve: %v", err)
+		return
 	}
 }
