@@ -7,6 +7,7 @@ import (
 	"log"
 )
 
+// ClientConfigPath путь до файла конфиг.
 const ClientConfigPath = "./configs/client_config.yaml"
 
 func main() {
@@ -17,13 +18,14 @@ func main() {
 		return
 	}
 
+	// cobra CLI и инициализация App
+
 	newApp := app.New(cfg)
 
 	rootCmd := &cobra.Command{
 		Use:   "file_transfer_client",
 		Short: "File Transfer CLI",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			// Инициализация приложения
 			if err = newApp.Initialize(); err != nil {
 				log.Fatalf("did not connect: %v", err)
 			}
@@ -33,7 +35,7 @@ func main() {
 		},
 	}
 
-	newApp.AddCommands(rootCmd)
+	newApp.AddCommands(rootCmd) // App
 
 	if err = rootCmd.Execute(); err != nil {
 		log.Fatalf("command execution failed: %v", err)

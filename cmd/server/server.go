@@ -6,6 +6,7 @@ import (
 	"log"
 )
 
+// ServerConfigPath путь до файла конфиг.
 const ServerConfigPath = "./configs/server_config.yaml"
 
 func main() {
@@ -15,6 +16,6 @@ func main() {
 		log.Printf("Error loading config: %v", err)
 		return
 	}
-
+	
 	app.Run(cfg)
 }

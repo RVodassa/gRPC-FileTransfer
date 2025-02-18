@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 type ClientService struct {
@@ -31,74 +30,77 @@ var ErrInternalServer = errors.New("internal server error")
 
 const defaultBufSize = 1024 * 1024 // 1 MB буфер для чтения/записи файлов
 
-func (c *ClientService) UploadFile(ctx context.Context, filename string) error {
+// UploadFile загружает файл на сервер
+func (c *ClientService) UploadFile(ctx context.Context, filePath string) error {
 	const op = "client.service.UploadFile"
 
-	// Открываем файл
-	file, err := os.Open(filename)
+	if filePath == "" {
+		log.Printf("%s: file path is empty", op)
+		return fmt.Errorf("%s: filename is required", op)
+	}
+	// Поиск файла
+	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Printf("%s: %v", op, ErrNotFound)
-			return ErrNotFound
+			log.Printf("%s: filePath:%s. Err: %v", op, filePath, ErrNotFound)
+			return fmt.Errorf("%s: filePath:%s. Err: %w", op, filePath, ErrNotFound)
 		}
-		log.Printf("%s: failed to open file: %v", op, err)
-		return fmt.Errorf("failed to open file: %v", err)
+		log.Printf("%s: filePath:%s. Err: %v", op, filePath, err)
+		return fmt.Errorf("%s: filePath:%s. Err: %w", op, filePath, err)
 	}
 	defer func() {
 		if err = file.Close(); err != nil {
-			log.Printf("%s: failed to close file: %v", op, err)
+			log.Printf("%s: filePath:%s. Err: %v", op, filePath, err)
 		}
 	}()
 
-	// Создаем контекст с таймаутом
-	ctx, cancel := context.WithTimeout(ctx, time.Second*60) // Увеличен таймаут
-	defer cancel()
-
-	// Создаем поток для загрузки файла
+	// Поток для загрузки файла
 	stream, err := c.client.UploadFile(ctx)
 	if err != nil {
 		return c.handleGRPCError(op, err)
 	}
 
-	// Отправляем имя файла
+	// Отправляет имя файла
+	filename := filepath.Base(filePath)
 	if err = stream.Send(&pb.UploadFileRequest{Filename: filepath.Base(filename)}); err != nil {
-		log.Printf("%s: failed to send filename: %v", op, err)
-		return fmt.Errorf("failed to send filename: %v", err)
+		log.Printf("%s: filename:%s. Err: %v", op, filename, err)
+		return fmt.Errorf("%s: filename:%s. Err: %w", op, filename, err)
 	}
-	log.Printf("%s: sent filename: %s", op, filepath.Base(filename))
 
 	// Передача данных
+	var n int
 	buf := make([]byte, defaultBufSize)
 	for {
-		n, err := file.Read(buf)
+		n, err = file.Read(buf)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
-			log.Printf("%s: failed to read file: %v", op, err)
-			return fmt.Errorf("failed to read file: %v", err)
+			log.Printf("%s: filename:%s. Err: %v", op, filename, err)
+			return fmt.Errorf("%s: filename:%s. Err: %w", op, filename, err)
 		}
 
 		if n > 0 {
-			if err := stream.Send(&pb.UploadFileRequest{Content: buf[:n]}); err != nil {
-				log.Printf("%s: failed to send file chunk: %v", op, err)
-				return fmt.Errorf("failed to send file chunk: %v", err)
+			if err = stream.Send(&pb.UploadFileRequest{Content: buf[:n]}); err != nil {
+				log.Printf("%s: filename:%s. Err: %v", op, filename, err)
+				return fmt.Errorf("%s: filename:%s. Err: %w", op, filename, err)
 			}
-			log.Printf("%s: sent %d bytes", op, n) // Лог отправленных байт
+			log.Printf("%s: filename:%s. Sent %d bytes", op, filename, n) // Лог отправленных байт
 		}
 	}
 
-	// Завершаем поток и получаем ответ
+	// Завершение потока и ответ
 	resp, err := stream.CloseAndRecv()
 	if err != nil {
-		log.Printf("%s: failed to receive response: %v", op, err)
-		return fmt.Errorf("failed to receive response: %v", err)
+		log.Printf("%s: filename:%s. Err: %v", op, filename, err)
+		return fmt.Errorf("%s: filename:%s. Err: %w", op, filename, err)
 	}
 
-	log.Printf("%s: server response: %s", op, resp.Message)
+	log.Printf("%s: filename:%s. %s", op, filename, resp.Message)
 	return nil
 }
 
+// ListFiles вернет список доступных на сервере файлов
 func (c *ClientService) ListFiles(ctx context.Context) error {
 	const op = "client.service.ListFiles"
 
@@ -115,6 +117,7 @@ func (c *ClientService) ListFiles(ctx context.Context) error {
 	return nil
 }
 
+// GetFile скачивает файл с сервера
 func (c *ClientService) GetFile(ctx context.Context, filename string) error {
 	const op = "client.service.GetFile"
 
@@ -129,59 +132,63 @@ func (c *ClientService) GetFile(ctx context.Context, filename string) error {
 		return c.handleGRPCError(op, err)
 	}
 
+	// Директория для хранения файлов клиента
 	if err = os.MkdirAll(c.dataDir, os.ModePerm); err != nil {
-		log.Printf("%s: failed to create directory: %v", op, err)
-		return fmt.Errorf("failed to create directory: %v", err)
+		log.Printf("%s: filename:%s. Err: %v", op, filename, err)
+		return fmt.Errorf("%s: filename:%s. Err: %w", op, filename, err)
 	}
 
 	// Создаем временный файл
 	tmpFilename := "downloaded_" + filename + ".tmp"
 	tmpFilePath := filepath.Join(c.dataDir, tmpFilename)
+
 	f, err := os.Create(tmpFilePath)
-	if errors.Is(err, os.ErrNotExist) {
-		log.Printf("%s: filepath:%s. Err: %v", op, fmt.Sprintf(c.dataDir+filename), ErrNotFound)
-		return fmt.Errorf("%s: filepath:%s. Err: %v", op, fmt.Sprintf(c.dataDir+filename), ErrNotFound)
-	}
 	if err != nil {
-		log.Printf("%s: failed to create temporary file: %v", op, err)
-		return fmt.Errorf("failed to create temporary file: %v", err)
+		if errors.Is(err, os.ErrNotExist) {
+			log.Printf("%s: filepath:%s. Err: %v", op, fmt.Sprintf(c.dataDir+filename), ErrNotFound)
+			return fmt.Errorf("%s: filepath:%s. Err: %w", op, fmt.Sprintf(c.dataDir+filename), ErrNotFound)
+		}
+		log.Printf("%s: filename:%s. Err: %v", op, filename, err)
+		return fmt.Errorf("%s: filename:%s. Err: %w", op, filename, err)
 	}
 
 	// Удаляем временный файл в случае ошибки
 	var success bool
 	defer func() {
-		if err := f.Close(); err != nil {
-			log.Printf("%s: failed to close temporary file: %v", op, err)
+		if err = f.Close(); err != nil {
+			log.Printf("%s: filename:%s. Err: %v", op, filename, err)
+			return
 		}
 		if !success {
-			if err := os.Remove(tmpFilePath); err != nil {
-				log.Printf("%s: failed to remove temporary file: %v", op, err)
+			if err = os.Remove(tmpFilePath); err != nil {
+				log.Printf("%s: filename:%s. Err: %v", op, filename, err)
 			}
 		}
 	}()
 
 	// Записываем данные во временный файл
+	var resp *pb.GetFileResponse
 	for {
-		resp, err := stream.Recv()
+		resp, err = stream.Recv()
 		if err != nil {
 			if err == io.EOF {
-				log.Printf("%s: file download completed: %s", op, filename)
+				log.Printf("%s: filename:%s. Download completed", op, filename)
 				break
 			}
 			return c.handleGRPCError(op, err)
 		}
 
 		if _, err = f.Write(resp.Content); err != nil {
-			log.Printf("%s: failed to write to file: %v", op, err)
-			return fmt.Errorf("failed to write to file: %v", err)
+			log.Printf("%s: filename:%s. Err: %v", op, filename, err)
+			return fmt.Errorf("%s: filename:%s. Err: %v", op, filename, err)
 		}
 	}
 
 	// Переименовываем временный файл в целевой
 	targetFilename := filepath.Join(c.dataDir, "downloaded_"+filename)
 	if err = os.Rename(tmpFilePath, targetFilename); err != nil {
-		log.Printf("%s: failed to rename temporary file: %v", op, err)
-		return fmt.Errorf("failed to rename temporary file: %v", err)
+		log.Printf("%s: filename:%s. Err: %v", op, filename, err)
+		return fmt.Errorf("%s: filename:%s. Err: %v", op, filename, err)
 	}
 
 	// Устанавливаем флаг успешного завершения

@@ -21,6 +21,7 @@ func New(cfg *config.Config) *App {
 	return &App{cfg: cfg}
 }
 
+// Initialize установка значений для полей conn и clientService в App
 func (a *App) Initialize() error {
 	const op = "app.Initialize"
 	var err error
@@ -34,6 +35,7 @@ func (a *App) Initialize() error {
 	return nil
 }
 
+// Close закрывает conn в App
 func (a *App) Close() {
 	const op = "app.Close"
 	if a.conn != nil {
@@ -45,6 +47,7 @@ func (a *App) Close() {
 	}
 }
 
+// AddCommands настройка команд cobra CLI
 func (a *App) AddCommands(rootCmd *cobra.Command) {
 
 	var uploadCmd = &cobra.Command{
