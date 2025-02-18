@@ -35,7 +35,7 @@ func main() {
 		},
 	}
 
-	newApp.AddCommands(rootCmd) // App
+	newApp.AddCommands(rootCmd)
 
 	if err = rootCmd.Execute(); err != nil {
 		log.Fatalf("command execution failed: %v", err)
